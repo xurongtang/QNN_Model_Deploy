@@ -1,0 +1,55 @@
+# 创建docker新ubuntu:22.04
+
+apt update
+
+apt install make -y
+
+source envsetup.sh
+
+./check-linux-dependency.sh
+
+./envcheck -c
+
+./envcheck -a
+
+apt-get update
+
+apt-get install -y python3.10 python3-distutils libpython3.10
+
+apt install python3.10-venv
+
+python3 -m venv QNN_venv --without-pip
+
+source QNN_venv/bin/activate
+
+python3 -m ensurepip --upgrade
+
+python ${QAIRT_SDK_ROOT}bin/check-python-dependency
+
+pip3 install qairt-visualizer==0.8.0
+pip3 install torch==1.13.1
+pip3 install torchvision==0.14.1
+pip3 install tensorflow==2.10.1  # 易冲突可不装
+pip3 install tflite==2.18.0
+pip3 install onnx==1.17.0
+pip3 install onnxruntime==1.22.0
+pip3 install onnxsim==0.4.36
+
+echo 'export ANDROID_NDK_ROOT="/project/3rdlibrary/android-ndk-r26c"' >> ~/.bashrc
+echo 'export PATH="${ANDROID_NDK_ROOT}:${PATH}"' >> ~/.bashrc
+
+source ~/.bashrc
+
+（退出后需要重新进入虚拟环境，并设置envsetup.sh
+source ./envsetup.sh）
+
+export PATH=${ANDROID_NDK_ROOT}:${PATH}
+
+./envcheck -a
+
+./envcheck -n
+
+遇到：
+ValueError: getBroadcastedTensorShape: Unable to broadcast shapes: IrTensorShape(dims = [1,1098563595,2,336] , dy_axes=[]) and IrTensorShape(dims = [1,16,1,178486] , dy_axes=[])
+解决：
+pip3 install numpy==1.26.4

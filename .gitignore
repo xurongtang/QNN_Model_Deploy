@@ -1,0 +1,9 @@
+3rdlibrary
+QNN_venv
+*.jpg
+*.raw
+*.pt
+*.onnx
+*.cpp
+*.bin
+*.json
