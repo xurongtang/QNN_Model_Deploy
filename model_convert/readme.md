@@ -196,11 +196,11 @@ export PATH=${ANDROID_NDK_ROOT}:${PATH}
 完成以上所有配置后，运行环境检查确认一切就绪：
 
 ```bash
+# 先进入虚拟环境
+source QNN_venv/bin/activate
+
 # 加载 SDK 环境变量
 source ${QAIRT_SDK_ROOT}/bin/envsetup.sh
-
-# 确保 NDK 在 PATH 中
-export PATH=${ANDROID_NDK_ROOT}:${PATH}
 
 # 检查全部环境
 ./envcheck -a
