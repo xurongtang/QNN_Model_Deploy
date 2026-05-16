@@ -4,6 +4,7 @@ QNN_venv
 *.raw
 *.pt
 *.onnx
-*.cpp
+model_convert/onnx2so/output/
 *.bin
 *.json
+build*/

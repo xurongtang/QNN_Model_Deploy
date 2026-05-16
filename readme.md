@@ -10,7 +10,7 @@
 - [项目结构](#项目结构)
 - [环境要求](#环境要求)
 - [模型转化及量化](#模型转化及量化)
-- [模型推理部署（待完成）](#模型推理部署待完成)
+- [模型推理部署](#模型推理部署)
 
 ---
 
@@ -28,7 +28,10 @@ PyTorch 模型 (.pt)
     校准数据集 (.raw + datasets.txt)
         │
         ▼  步骤三：QNN 量化 + 编译
-    QNN 量化模型 (.so)  →  部署到 Android 设备
+    QNN 量化模型 (.so)
+        │
+        ▼  步骤四：Android C++ 推理
+    test_classify / 业务推理模块
 ```
 
 **核心技术栈**：
@@ -45,6 +48,9 @@ PyTorch 模型 (.pt)
 ```
 QNN_proj/
 ├── readme.md                          # 本文件 — 项目总览
+├── CMakeLists.txt                     # Android 端 C++ 推理构建配置
+├── build.sh                           # Android arm64-v8a 一键编译脚本
+├── test_classify.cpp                  # 10 类分类模型推理测试入口
 ├── 步骤.txt                           # 环境搭建步骤速查
 ├── model_convert/                     # 模型转换相关文件
 │   ├── readme.md                      # 详细的模型转换教程
@@ -59,7 +65,9 @@ QNN_proj/
 │       ├── dataset_img/               #   原始校准图片目录
 │       ├── dataset_raw/               #   预处理后的 .raw 文件
 │       └── output/                    #   QNN 量化模型输出
-├── model_inference/                   # 模型推理（待完成）
+├── model_inference/                   # Android C++ 模型推理
+│   ├── model_inference_base/          #   QNN backend/model/graph 通用封装
+│   └── classification/                #   YOLO 分类模型推理封装
 └── model_int8_convert/                # INT8 转换（待完成）
 ```
 
@@ -72,7 +80,8 @@ QNN_proj/
 | 操作系统 | Ubuntu 22.04 (Docker) | 推荐在 Docker 容器中操作 |
 | Python | 3.10 | QNN SDK 兼容性最佳 |
 | Qualcomm AI Engine Direct SDK | 2.44.0+ | 提供 QNN 工具链 |
-| Android NDK | r26c | 编译 Android `.so` 库 |
+| Android NDK | r26c | 编译 Android 模型推理程序 |
+| OpenCV Android SDK | 4.x | 图像读取、resize、颜色转换 |
 | PyTorch | 1.13.1 | 模型导出 |
 | ONNX | 1.17.0 | 模型中间格式 |
 | NumPy | 1.26.4 | 注意版本兼容性 |
@@ -124,11 +133,47 @@ bash convert.sh
 
 ---
 
-## 模型推理部署（待完成）
+## 模型推理部署
 
-> **TODO**：此部分将包含以下内容：
-> - Android 端 QNN Runtime 集成
-> - `.so` 模型加载与推理接口调用
-> - 前后处理流程（预处理、NMS 后处理等）
-> - 性能基准测试与优化
-> - 端到端 Demo 应用
+当前已实现 Android C++ 端 QNN 推理链路：
+
+- `QnnModelInferenceBase`：封装 QNN backend/model 动态加载、backend/device/context 创建、graph compose/finalize、tensor buffer 分配和 `graphExecute`。
+- `YoloClassificationInference`：继承基类，完成 `cv::Mat` 输入的 YOLO 分类预处理和 10 类输出后处理。
+- `test_classify`：命令行测试程序，输出初始化耗时、单次推理耗时、Top1 和 10 类分数。
+
+### 编译
+
+项目内置路径默认指向 `3rdlibrary` 下的 Android NDK、OpenCV Android SDK 和 QNN SDK：
+
+```bash
+./build.sh
+```
+
+生成文件：
+
+```bash
+build/android-arm64-v8a/test_classify
+```
+
+### 设备部署
+
+以 HTP 后端为例，需要同时部署 ARM 侧 QNN runtime、模型 `.so`、测试程序，以及 DSP 侧 `hexagon-v*` 的 `Skel` 库。SM8650 / Snapdragon 8 Gen 3 对应 `hexagon-v75/unsigned`。
+
+设备侧运行示例：
+
+```bash
+cd /data/local/tmp/test
+export LD_LIBRARY_PATH=$PWD:../common_lib:$LD_LIBRARY_PATH
+export ADSP_LIBRARY_PATH="../common_lib;$PWD;/vendor/lib64/rfsa/adsp;/vendor/dsp/cdsp;/system/lib/rfsa/adsp"
+./test_classify ../common_lib/libQnnHtp.so ./libyolo26n-cls_qnn_quantized_model.so ./ILSVRC2012_val_00002138.JPEG
+```
+
+输出示例：
+
+```text
+houji:/data/local/tmp/test $ ./running.sh
+Init time: 724.035417 ms
+Infer time: 6.519896 ms
+Top1: class_id=0, label=class_0, score=0.996094
+Scores: [0]=0.996094 [1]=0.000000 [2]=0.003906 [3]=0.000000 [4]=0.000000 [5]=0.000000 [6]=0.000000 [7]=0.000000 [8]=0.000000 [9]=0.000000
+```
